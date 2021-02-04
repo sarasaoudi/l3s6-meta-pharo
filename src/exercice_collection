@@ -1,0 +1,17 @@
+SAOUDI SARA
+La collection: #(1 2 3 -44 0 5 6 4 5 -3 22 1 2 5)
+
+1/Donnez l’expression qui rend la liste des nombres positifs
+#(1 2 3 -44 0 5 6 4 5 -3 22 1 2 5) select: [ :i|i >=0 ]
+
+2/Donnez l’expression qui rend la liste des carrés des nombres
+#(1 2 3 -44 0 5 6 4 5 -3 22 1 2 5) collect: [ :i|i squared]
+
+3/Donnez l’expression qui rend la somme des nombres
+| sum |
+	sum := 0.
+	#(1 2 3 -44 0 5 6 4 5 -3 22 1 2 5) do: [:item | sum := sum + item].
+	sum
+
+4/Donnez l’expression qui rend le premier nombre négatif
+#(1 2 3 -44 0 5 6 4 5 -3 22 1 2 5)detect:[:i|i<0]
