@@ -43,6 +43,15 @@ Die >> initialize [
 		faces := 6
 ]
 
+{ #category : #printing }
+Die >> printOn: aStream [
+"a Die (faces number)"
+	super printOn: aStream.
+	aStream nextPutAll: '('.
+	aStream print: faces.
+	aStream nextPutAll: ')'
+]
+
 { #category : #accesing }
 Die >> roll [
 
