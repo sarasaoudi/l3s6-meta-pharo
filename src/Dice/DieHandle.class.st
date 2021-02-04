@@ -7,6 +7,17 @@ Class {
 	#category : #Dice
 }
 
+{ #category : #arithmetic }
+DieHandle >> + aDieHandle [
+
+	| handle |
+	handle := DieHandle new.
+	self dice do: [:each | handle addDie: each].
+	aDieHandle dice do: [ :each |handle  addDie: each ].
+	^handle
+	
+]
+
 { #category : #accesing }
 DieHandle >> addDie: aDie [
 
