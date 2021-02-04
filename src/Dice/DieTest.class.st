@@ -6,7 +6,7 @@ Class {
 
 { #category : #tests }
 DieTest >> testCreationIsOk [
-	self assert: (Die withfaces: 20) faces equals:20
+	self assert: (Die withFaces: 20) faces equals:20
 ]
 
 { #category : #tests }

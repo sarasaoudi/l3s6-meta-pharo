@@ -17,7 +17,7 @@ Class {
 }
 
 { #category : #'instance creation' }
-Die class >> withfaces: aNumber [
+Die class >> withFaces: aNumber [
 	"Create and initialize a new die with aNumber faces"
 	| instance |
 	instance := self new.
