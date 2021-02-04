@@ -16,9 +16,24 @@ Class {
 	#category : #Dice
 }
 
+{ #category : #'instance creation' }
+Die class >> withfaces: aNumber [
+	"Create and initialize a new die with aNumber faces"
+	| instance |
+	instance := self new.
+	instance faces: aNumber.
+	^ instance
+	
+]
+
 { #category : #accesing }
 Die >> faces [
 	^ faces
+]
+
+{ #category : #accessing }
+Die >> faces: anInteger [ 
+	faces := anInteger
 ]
 
 { #category : #initialization }
