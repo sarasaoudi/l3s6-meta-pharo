@@ -8,8 +8,14 @@ Class {
 }
 
 { #category : #arithmetic }
-DieHandle >> + aDicable [
-^aDicable sumWithHandle: self
+DieHandle >> + aDieHandle [
+
+	| handle |
+	handle := DieHandle new.
+	self dice do: [:each | handle addDie: each].
+	aDieHandle dice do: [ :each |handle  addDie: each ].
+	^handle
+	
 ]
 
 { #category : #accesing }
