@@ -3,10 +3,32 @@ Class {
 	#superclass : #Object,
 	#instVars : [
 		'receiver',
-		'variables'
+		'variables',
+		'parentScope'
 	],
 	#category : #'Champollion-Core'
 }
+
+{ #category : #accessing }
+CHMethodeScope >> includesKey: aString [ 
+	^ variables includesKey: aString 
+]
+
+{ #category : #accessing }
+CHMethodeScope >> initialize [ 	
+	super initialize .
+	variables := Dictionary new.
+]
+
+{ #category : #accessing }
+CHMethodeScope >> parentScope [
+	^ parentScope 
+]
+
+{ #category : #accessing }
+CHMethodeScope >> parentScope: aScope [
+	parentScope := aScope 
+]
 
 { #category : #accessing }
 CHMethodeScope >> read: aString [ 

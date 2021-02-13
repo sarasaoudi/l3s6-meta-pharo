@@ -3,35 +3,41 @@ Class {
 	#superclass : #Object,
 	#instVars : [
 		'stack',
-		'globalScope'
+		'globalScope',
+		'primitives'
 	],
 	#category : #'Champollion-Core'
 }
 
 { #category : #running }
+CHInterpreter >> argumentAt: anInteger [ 
+^ self tempAt: (self currentMethod arguments at: anInteger ) name
+]
+
+{ #category : #running }
 CHInterpreter >> currentScope [ 
-	^ self topFrame
+^ self topFrame
 ]
 
 { #category : #running }
 CHInterpreter >> execute: anAST [
-	^ self visitNode: anAST 
+^ self visitNode: anAST 
 ]
 
 { #category : #running }
 CHInterpreter >> execute: anAST withReceiver: anObject [ 
-	| result |
-	self pushNewFrame.
-	"Set up the scope chain"
-	self topFrame parentScope: (CHInstanceScope new 
-		receiver: anObject;
-		parentScope: globalScope;
-		yourself);
-	yourself.
-	self topFrame receiver: anObject.
-	result := self visitNode: anAST.
-	self popFrame.
-	^ result
+| result |
+self pushNewFrame.
+"Set up the scope chain"
+self topFrame parentScope: (CHInstanceScope new 
+	receiver: anObject;
+	parentScope: globalScope;
+	yourself);
+yourself.
+self topFrame receiver: anObject.
+result := self visitNode: anAST.
+self popFrame.
+^ result
 ]
 
 { #category : #running }
@@ -57,14 +63,9 @@ CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
 	self pushNewFrame.
-	self topFrame parentScope: (CHInstanceScope new 
-		receiver: anObject;
-		parentScope: globalScope;
-		yourself);
-	yourself.
-	self topFrame receiver: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self topFrame at: arg name put: value ].
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName  put: nil ].
+	self tempAt: #___method put: anAST.
+	self tempAt: #self put: anObject.  
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
 	result := self visitNode: anAST body .
 	self popFrame.
 	^ result
@@ -79,6 +80,16 @@ CHInterpreter >> executeMethode: anAST withReceiver: anObject [
 ]
 
 { #category : #running }
+CHInterpreter >> executePrimitiveMethod: anAST [ 
+	| primitiveNumber |
+	primitiveNumber := anAST pragmas 
+		detect: [ :each |each isPrimitive ]
+		ifFound: [ :aPragmaPrimitive | aPragmaPrimitive arguments first value ]
+		ifNone: [ self error: 'Not a primitive method' ].
+	^ self perform: (primitives at: primitiveNumber )
+]
+
+{ #category : #running }
 CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject [ 
 	globalScope at: aSymbol put: anObject 
 ]
@@ -88,11 +99,40 @@ CHInterpreter >> initialize [
 	super initialize .
 	globalScope := CHGlobalScope new.
 	stack := CTStack new.
+	primitives := Dictionary new.
+	self initializePrimitiveTable.
+]
+
+{ #category : #running }
+CHInterpreter >> initializePrimitiveTable [
+	primitives at: 1 put: #primitiveSmallIntegerAdd
+]
+
+{ #category : #running }
+CHInterpreter >> lookup: aSymbol fromClass: aClass [ 
+	"return the AST of a method or nil if none is found"
+	"If the class defines a method for the selector, return the AST corresponding to the method"
+	(aClass includesSelector: aSymbol )
+		ifTrue: [ ^ (aClass compiledMethodAt: aSymbol ) ast ].
+	"Otherwise lookup recursively in the superclass. If we reach the end of the hierarchy return nil"
+	^ aClass superclass 
+		ifNil: [ nil ]
+		ifNotNil: [ self lookup: aSymbol fromClass: aClass superclass ]
 ]
 
 { #category : #running }
 CHInterpreter >> popFrame [
 	stack pop
+]
+
+{ #category : #running }
+CHInterpreter >> primitiveSmallIntegerAdd [
+	| receiver argument |
+	receiver := self receiver.
+	receiver class = SmallInteger 
+		ifFalse: [ CHPrimitiveFail signal ].
+	argument  := self argumentAt: 1.
+	^ receiver + argument
 ]
 
 { #category : #running }
@@ -114,6 +154,28 @@ CHInterpreter >> scopeDefining: aName [
 ]
 
 { #category : #running }
+CHInterpreter >> send: aSelector receiver: newReceiver lookupFromClass: lookupClass arguments: arguments [
+		"Lookup a selector from a class, and activate the method.
+		Handle does not understand case and message reification on demande if lookup fails."
+		| method |
+		method := self lookup: aSelector fromClass: lookupClass .
+		method ifNil: [ | messageReification | 
+			messageReification := Message 
+				selector: aSelector 
+				arguments: arguments .
+			^ self send: #doesNotUnderstand:
+					 receiver: newReceiver
+					 lookupFromClass: lookupClass 
+					 arguments: { messageReification } ].
+		^ self execute: method withReceiver: newReceiver  andArguments: arguments   
+]
+
+{ #category : #running }
+CHInterpreter >> smallintAdd [
+	^ 1 + 5
+]
+
+{ #category : #running }
 CHInterpreter >> tempAt: aSymbol put: anInteger [
 	self topFrame at: aSymbol put: anInteger 
 ]
@@ -121,6 +183,12 @@ CHInterpreter >> tempAt: aSymbol put: anInteger [
 { #category : #running }
 CHInterpreter >> topFrame [
 	^ stack top
+]
+
+{ #category : #visiting }
+CHInterpreter >> visitArrayNode: aRBArrayNode [
+	^ aRBArrayNode statements 
+	collect: [ :e | self visitNode: e ] as: Array
 ]
 
 { #category : #running }
@@ -159,15 +227,23 @@ CHInterpreter >> visitLiteralValueNode: aLiteralValueNode [
 
 { #category : #running }
 CHInterpreter >> visitMessageNode: aMessageNode [ 
-	| newReceiver method args |
+	| newReceiver args lookupClass |
 	newReceiver := self visitNode: aMessageNode receiver.
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	method := (newReceiver class compiledMethodAt: aMessageNode selector) ast.
-	^ self executeMethod: method withReceiver: newReceiver andArguments: args 
+	lookupClass := aMessageNode receiver isSuperVariable
+		ifTrue: [ self currentMethod methodClass superclass ]
+		ifFalse: [ newReceiver class ].
+	^ self
+		send: aMessageNode 
+		receiver: newReceiver 
+		lookupFromClass: lookupClass 
+		arguments: args asArray  
 ]
 
 { #category : #running }
 CHInterpreter >> visitMethodNode: aMethodeNode [
+	[ aMethodeNode isPrimitive ifTrue: [ ^ self executePrimitiveMethod: aMethodeNode  ]]
+		on: CHPrimitiveFail do: [ :err | "Nothing, just continue with the method body"].
 	^ self visitNode: aMethodeNode body
 ]
 
